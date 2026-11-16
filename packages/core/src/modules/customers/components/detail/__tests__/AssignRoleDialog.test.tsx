@@ -1,0 +1,562 @@
+/**
+ * @jest-environment jsdom
+ */
+import * as React from 'react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { renderWithProviders } from '@open-mercato/shared/lib/testing/renderWithProviders'
+import { AssignRoleDialog } from '../AssignRoleDialog'
+
+const readApiResultOrThrowMock = jest.fn()
+
+jest.mock('@open-mercato/ui/backend/utils/apiCall', () => ({
+  readApiResultOrThrow: (...args: unknown[]) => readApiResultOrThrowMock(...args),
+}))
+
+jest.mock('@open-mercato/ui/primitives/dialog', () => ({
+  Dialog: ({ open, children }: { open: boolean; children: React.ReactNode }) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children, ...props }: React.HTMLAttributes<HTMLDivElement>) => <div {...props}>{children}</div>,
+  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+}))
+
+describe('AssignRoleDialog', () => {
+  beforeEach(() => {
+    readApiResultOrThrowMock.mockReset()
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: [
+        {
+          userId: 'user-1',
+          displayName: 'Ada Lovelace',
+          teamName: 'Sales',
+          user: { email: 'ada@example.com' },
+        },
+        {
+          userId: 'user-2',
+          displayName: 'Grace Hopper',
+          teamName: 'Success',
+          user: { email: 'grace@example.com' },
+        },
+      ],
+    })
+  })
+
+  it('marks users who already hold another role as advisory, not as a conflict, and still assigns them (#7491)', async () => {
+    const onAssign = jest.fn(async () => undefined)
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={onAssign}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+          { id: 'rt-2', value: 'service_owner', label: 'Service owner' },
+        ]}
+        entityName="Acme Corp"
+        initialRoleType="service_owner"
+        existingRoleTypes={new Set(['account_manager'])}
+        existingAssignments={[
+          {
+            id: 'role-1',
+            roleType: 'account_manager',
+            userId: 'user-1',
+            userName: 'Ada Lovelace',
+            userEmail: 'ada@example.com',
+            createdAt: '2026-04-10T10:00:00.000Z',
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(readApiResultOrThrowMock).toHaveBeenCalled()
+    })
+
+    expect(screen.getByText('Service owner')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Already assigned: Account manager')).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Conflict/)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Ada Lovelace/i }))
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Already assigned: Account manager').length).toBeGreaterThan(1)
+    })
+    expect(screen.getByText('One person can hold several roles on this record.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Assign role' }))
+
+    await waitFor(() => {
+      expect(onAssign).toHaveBeenCalledWith('service_owner', 'user-1')
+    })
+  })
+
+  it('lets a candidate row wrap so a long advisory badge stays inside the card on a narrow screen (#7491)', async () => {
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[
+          { id: 'rt-1', value: 'budget_holder', label: 'Budget holder' },
+          { id: 'rt-2', value: 'decision_maker', label: 'Decision maker' },
+          { id: 'rt-3', value: 'end_user', label: 'End user' },
+        ]}
+        entityName="Acme Corp"
+        initialRoleType="end_user"
+        existingRoleTypes={new Set(['budget_holder', 'decision_maker'])}
+        existingAssignments={[
+          {
+            id: 'role-1',
+            roleType: 'budget_holder',
+            userId: 'user-1',
+            userName: 'Ada Lovelace',
+            userEmail: 'ada@example.com',
+            createdAt: '2026-04-10T10:00:00.000Z',
+          },
+          {
+            id: 'role-2',
+            roleType: 'decision_maker',
+            userId: 'user-1',
+            userName: 'Ada Lovelace',
+            userEmail: 'ada@example.com',
+            createdAt: '2026-04-10T10:00:00.000Z',
+          },
+        ]}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Already assigned: Budget holder, Decision maker')).toBeInTheDocument()
+    })
+
+    const candidateRow = screen.getByRole('button', { name: /Ada Lovelace/i })
+    expect(candidateRow).toHaveClass('whitespace-normal', 'break-words')
+    expect(candidateRow).not.toHaveClass('whitespace-nowrap')
+  })
+
+  it('changes an existing assignee through the same dialog with the role fixed (#7490)', async () => {
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: [
+        { userId: 'user-1', displayName: 'Ada Lovelace', user: { email: 'ada@example.com' } },
+        { userId: 'user-2', displayName: 'Grace Hopper', user: { email: 'grace@example.com' } },
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    })
+    const onAssign = jest.fn(async () => undefined)
+    const onReassign = jest.fn(async () => undefined)
+    const onClose = jest.fn()
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={onClose}
+        onAssign={onAssign}
+        onReassign={onReassign}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+          { id: 'rt-2', value: 'service_owner', label: 'Service owner' },
+        ]}
+        entityName="Acme Corp"
+        existingRoleTypes={new Set(['account_manager'])}
+        editingAssignment={{
+          id: 'role-1',
+          roleType: 'account_manager',
+          userId: 'user-1',
+          userName: 'Ada Lovelace',
+          userEmail: 'ada@example.com',
+        }}
+      />,
+    )
+
+    expect(screen.getByText('Change assignee')).toBeInTheDocument()
+    expect(screen.getByText('Currently: Ada Lovelace')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Current')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Grace Hopper/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save change' }))
+
+    await waitFor(() => {
+      expect(onReassign).toHaveBeenCalledWith('role-1', 'user-2')
+    })
+    expect(onAssign).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('writes nothing when the incumbent is confirmed again or the dialog is cancelled (#7490)', async () => {
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: [{ userId: 'user-1', displayName: 'Ada Lovelace', user: { email: 'ada@example.com' } }],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    })
+    const onReassign = jest.fn(async () => undefined)
+    const onClose = jest.fn()
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={onClose}
+        onAssign={jest.fn(async () => undefined)}
+        onReassign={onReassign}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        existingRoleTypes={new Set(['account_manager'])}
+        editingAssignment={{ id: 'role-1', roleType: 'account_manager', userId: 'user-1', userName: 'Ada Lovelace' }}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(readApiResultOrThrowMock).toHaveBeenCalled()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save change' }))
+    expect(onReassign).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onReassign).not.toHaveBeenCalled()
+    expect(onClose).toHaveBeenCalledTimes(2)
+  })
+
+  it('restores keyboard retry focus and preserves the selection after a failed save (#7490)', async () => {
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: [
+        { userId: 'user-1', displayName: 'Ada Lovelace', user: { email: 'ada@example.com' } },
+        { userId: 'user-2', displayName: 'Grace Hopper', user: { email: 'grace@example.com' } },
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    })
+    let rejectSave: (error: Error) => void = () => undefined
+    const onReassign = jest.fn()
+      .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectSave = reject }))
+      .mockResolvedValueOnce(undefined)
+    const onClose = jest.fn()
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={onClose}
+        onAssign={jest.fn(async () => undefined)}
+        onReassign={onReassign}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        existingRoleTypes={new Set(['account_manager'])}
+        editingAssignment={{ id: 'role-1', roleType: 'account_manager', userId: 'user-1', userName: 'Ada Lovelace' }}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /Grace Hopper/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    const saveButton = screen.getByRole('button', { name: 'Save change' })
+    saveButton.focus()
+    fireEvent.click(saveButton)
+    await waitFor(() => expect(saveButton).toBeDisabled())
+    document.body.tabIndex = -1
+    document.body.focus()
+    document.body.removeAttribute('tabindex')
+    rejectSave(new Error('[internal] save failed'))
+
+    await waitFor(() => {
+      expect(onReassign).toHaveBeenCalledTimes(1)
+    })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Save change' })).toBeEnabled()
+    expect(screen.getAllByText('Grace Hopper').length).toBeGreaterThan(0)
+    await waitFor(() => expect(saveButton).toHaveFocus())
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Enter', ctrlKey: true })
+    await waitFor(() => expect(onReassign).toHaveBeenCalledTimes(2))
+    expect(onReassign).toHaveBeenLastCalledWith('role-1', 'user-2')
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+
+  it('shows a visible load error instead of an empty results state when staff lookup fails', async () => {
+    readApiResultOrThrowMock.mockRejectedValueOnce(new Error('Forbidden'))
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+        ]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Unable to load team members. Check your permissions and try again.'),
+      ).toBeInTheDocument()
+    })
+  })
+
+  // The load-more guard used to be `users.length >= totalUsers`. When the
+  // reported total under-reports the result set — a capped list count, or rows
+  // inserted between requests — the button vanished and the remaining members
+  // were unreachable. Termination now follows the page being full.
+  it('offers Load more when the page came back full even though total under-reports', async () => {
+    readApiResultOrThrowMock
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 24 }, (_, index) => ({
+          userId: `user-${index + 1}`,
+          displayName: `User ${index + 1}`,
+          teamName: 'Sales',
+          user: { email: `user${index + 1}@example.com` },
+        })),
+        // Deliberately lower than the rows actually available.
+        total: 5,
+        page: 1,
+        pageSize: 24,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            userId: 'user-25',
+            displayName: 'User 25',
+            teamName: 'Sales',
+            user: { email: 'user25@example.com' },
+          },
+        ],
+        total: 5,
+        page: 2,
+        pageSize: 24,
+      })
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    const loadMore = await screen.findByRole('button', { name: 'Load more' })
+    fireEvent.click(loadMore)
+
+    await waitFor(() => {
+      expect(readApiResultOrThrowMock).toHaveBeenNthCalledWith(
+        2,
+        '/api/staff/team-members/assignable?page=2&pageSize=24',
+        undefined,
+      )
+    })
+    expect(await screen.findByText('User 25')).toBeInTheDocument()
+  })
+
+  it('stops offering Load more once a page comes back short', async () => {
+    readApiResultOrThrowMock.mockReset()
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: Array.from({ length: 3 }, (_, index) => ({
+        userId: `user-${index + 1}`,
+        displayName: `User ${index + 1}`,
+        teamName: 'Sales',
+        user: { email: `user${index + 1}@example.com` },
+      })),
+      // A total far above the rows returned must not conjure a next page.
+      total: 999,
+      page: 1,
+      pageSize: 24,
+    })
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    expect(await screen.findByText('User 1')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+  })
+
+  // `/api/staff/team-members/assignable` is a query-engine list, so a page past
+  // the end comes back empty rather than re-serving the last one. That empty
+  // page is what ends the sequence.
+  it('stops on the empty page past the end', async () => {
+    readApiResultOrThrowMock.mockReset()
+    readApiResultOrThrowMock
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 24 }, (_, index) => ({
+          userId: `user-${index + 1}`,
+          displayName: `User ${index + 1}`,
+          teamName: 'Sales',
+          user: { email: `user${index + 1}@example.com` },
+        })),
+        total: 24,
+        page: 1,
+        pageSize: 24,
+      })
+      .mockResolvedValueOnce({ items: [], total: 24, page: 2, pageSize: 24 })
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Load more' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull()
+    })
+    expect(screen.getByText('User 24')).toBeInTheDocument()
+  })
+
+  // A full page whose rows collapse under the client dedupe must still offer
+  // the next one: the guard reads what the server served.
+  it('offers Load more when dedupe shortens a full page', async () => {
+    readApiResultOrThrowMock.mockReset()
+    readApiResultOrThrowMock.mockResolvedValue({
+      items: Array.from({ length: 24 }, () => ({
+        userId: 'user-1',
+        displayName: 'User 1',
+        teamName: 'Sales',
+        user: { email: 'user1@example.com' },
+      })),
+      total: 24,
+      page: 1,
+      pageSize: 24,
+    })
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[{ id: 'rt-1', value: 'account_manager', label: 'Account manager' }]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    expect(await screen.findByText('User 1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Load more' })).toBeInTheDocument()
+  })
+
+  it('keeps the footer actions available after selecting a user and can load more results', async () => {
+    readApiResultOrThrowMock
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 24 }, (_, index) => ({
+          userId: `user-${index + 1}`,
+          displayName: `User ${index + 1}`,
+          teamName: 'Sales',
+          user: { email: `user${index + 1}@example.com` },
+        })),
+        total: 26,
+        page: 1,
+        pageSize: 24,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            userId: 'user-25',
+            displayName: 'User 25',
+            teamName: 'Sales',
+            user: { email: 'user25@example.com' },
+          },
+          {
+            userId: 'user-26',
+            displayName: 'User 26',
+            teamName: 'Sales',
+            user: { email: 'user26@example.com' },
+          },
+        ],
+        total: 26,
+        page: 2,
+        pageSize: 24,
+      })
+
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+        ]}
+        entityName="Acme Corp"
+        initialRoleType="account_manager"
+      />,
+    )
+
+    expect(await screen.findByText('Showing 24 of 26 team members')).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /user 1.*user1@example\.com/i,
+      }),
+    )
+
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+
+    await waitFor(() => {
+      expect(readApiResultOrThrowMock).toHaveBeenNthCalledWith(
+        2,
+        '/api/staff/team-members/assignable?page=2&pageSize=24',
+        undefined,
+      )
+    })
+
+    expect(await screen.findByText('Showing 26 of 26 team members')).toBeInTheDocument()
+  })
+
+  it('shows "Manage role types" link when canManageRoleTypes is true', () => {
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+        ]}
+        entityName="Acme Corp"
+        canManageRoleTypes
+      />,
+    )
+
+    const link = screen.getByTestId('assign-role-dialog-manage-role-types')
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/backend/config/customers')
+    expect(link).toHaveTextContent('Manage role types')
+  })
+
+  it('hides "Manage role types" link when canManageRoleTypes is false or absent', () => {
+    renderWithProviders(
+      <AssignRoleDialog
+        open
+        onClose={jest.fn()}
+        onAssign={jest.fn(async () => undefined)}
+        roleTypes={[
+          { id: 'rt-1', value: 'account_manager', label: 'Account manager' },
+        ]}
+        entityName="Acme Corp"
+      />,
+    )
+
+    expect(screen.queryByTestId('assign-role-dialog-manage-role-types')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('assign-role-dialog-manage-role-types-step2')).not.toBeInTheDocument()
+  })
+})

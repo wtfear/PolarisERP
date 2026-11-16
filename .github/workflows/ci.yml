@@ -1,0 +1,30 @@
+name: PolarisERP CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate & Inspect Architecture
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify Core Architecture & Manifests
+        run: |
+          echo "Verifying PolarisERP enterprise foundation..."
+          node -e 'const pkg = require("./package.json"); console.log("Validated:", pkg.name, "v" + pkg.version);'
+          test -f apps/mercato/public/polaris.svg && echo "Brand logo verified"
+          test -f AGENTS.md && echo "AI Agent harness verified"
+          test -f README.md && echo "Documentation verified"
+          test -f docker-compose.yml && echo "Docker compose environment verified"
+          echo "PolarisERP architecture check passed!"

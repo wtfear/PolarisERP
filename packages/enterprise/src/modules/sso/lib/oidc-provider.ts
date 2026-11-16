@@ -1,0 +1,282 @@
+import * as client from 'openid-client'
+import { createHash } from 'node:crypto'
+import type { SsoConfig } from '../data/entities'
+import type { SsoIdentityPayload, SsoProtocolProvider } from './types'
+import type { UrlSafetyReason } from '@open-mercato/shared/lib/url-safety'
+import { resolveTranslations } from '@open-mercato/shared/lib/i18n/server'
+import { createOidcFetch, UnsafeOidcUrlError } from './oidc-url-safety'
+
+const OIDC_DISCOVERY_TIMEOUT_SECONDS = 10
+const OIDC_DISCOVERY_CACHE_TTL_MS = 5 * 60 * 1000
+const OIDC_DISCOVERY_CACHE_MAX_ENTRIES = 100
+
+const OIDC_URL_ERROR_MESSAGES: Record<UrlSafetyReason, { key: string; fallback: string }> = {
+  invalid_url: { key: 'sso.errors.oidc_url.invalid_url', fallback: 'OIDC endpoint URL is invalid' },
+  forbidden_protocol: { key: 'sso.errors.oidc_url.forbidden_protocol', fallback: 'OIDC endpoint URL must use HTTPS' },
+  credentials_in_url: { key: 'sso.errors.oidc_url.credentials_in_url', fallback: 'OIDC endpoint URL must not contain credentials' },
+  missing_host: { key: 'sso.errors.oidc_url.missing_host', fallback: 'OIDC endpoint URL must include a host' },
+  blocked_hostname: { key: 'sso.errors.oidc_url.blocked_hostname', fallback: 'OIDC endpoint host is not allowed' },
+  private_ip_literal: { key: 'sso.errors.oidc_url.private_ip_literal', fallback: 'OIDC endpoint must use a public IP address' },
+  private_ip_resolved: { key: 'sso.errors.oidc_url.private_ip_resolved', fallback: 'OIDC endpoint must resolve only to public IP addresses' },
+  dns_resolution_failed: { key: 'sso.errors.oidc_url.dns_resolution_failed', fallback: 'OIDC endpoint DNS lookup failed; check the provider configuration' },
+  dns_resolution_empty: { key: 'sso.errors.oidc_url.dns_resolution_empty', fallback: 'OIDC endpoint has no DNS address records; check the provider configuration' },
+}
+
+interface CachedDiscovery {
+  expiresAt: number
+  promise: Promise<client.Configuration>
+}
+
+const sharedDiscoveryCache = new Map<string, CachedDiscovery>()
+
+export class OidcProvider implements SsoProtocolProvider {
+  readonly protocol = 'oidc' as const
+  private readonly requestDiscoveryCache = new Map<string, CachedDiscovery>()
+  private readonly guardedFetch = createOidcFetch()
+
+  async buildAuthUrl(
+    config: SsoConfig,
+    params: {
+      state: string
+      nonce: string
+      redirectUri: string
+      codeVerifier?: string
+      clientSecret?: string
+    },
+  ): Promise<string> {
+    const oidcConfig = await this.discover(config, params.clientSecret)
+
+    const codeChallenge = params.codeVerifier
+      ? await client.calculatePKCECodeChallenge(params.codeVerifier)
+      : undefined
+
+    const authUrl = client.buildAuthorizationUrl(oidcConfig, {
+      redirect_uri: params.redirectUri,
+      scope: 'openid email profile',
+      state: params.state,
+      nonce: params.nonce,
+      ...(codeChallenge
+        ? { code_challenge: codeChallenge, code_challenge_method: 'S256' }
+        : {}),
+    })
+
+    return authUrl.href
+  }
+
+  async handleCallback(
+    config: SsoConfig,
+    params: {
+      callbackParams: Record<string, string>
+      redirectUri: string
+      expectedState: string
+      expectedNonce: string
+      codeVerifier?: string
+      clientSecret?: string
+    },
+  ): Promise<SsoIdentityPayload> {
+    const oidcConfig = await this.discover(config, params.clientSecret)
+
+    const callbackUrl = new URL(params.redirectUri)
+    for (const [key, value] of Object.entries(params.callbackParams)) {
+      callbackUrl.searchParams.set(key, value)
+    }
+
+    const tokens = await client.authorizationCodeGrant(oidcConfig, callbackUrl, {
+      pkceCodeVerifier: params.codeVerifier,
+      expectedState: params.expectedState,
+      expectedNonce: params.expectedNonce,
+    })
+
+    const claims = tokens.claims()
+    if (!claims) {
+      throw new Error('No ID token claims received from IdP')
+    }
+
+    const mergedClaims = await mergeWithUserInfoClaims(oidcConfig, tokens, claims)
+
+    const subject = String(mergedClaims.sub ?? claims.sub ?? '')
+    const rawEmail = mergedClaims.email as string | undefined
+    const upnCandidate = (mergedClaims.upn ?? mergedClaims.unique_name) as string | undefined
+    const upnAsEmail = typeof upnCandidate === 'string' && upnCandidate.includes('@') ? upnCandidate : undefined
+    const email = rawEmail ?? upnAsEmail
+    if (!email) {
+      throw new Error('IdP did not return an email claim (checked: email, upn, unique_name)')
+    }
+
+    const emailVerified = normalizeEmailVerifiedClaim(mergedClaims.email_verified)
+    const groups = extractIdentityGroups(mergedClaims)
+
+    return {
+      subject,
+      email,
+      ...(emailVerified === undefined ? {} : { emailVerified }),
+      name: (mergedClaims.name as string) ?? undefined,
+      groups,
+    }
+  }
+
+  async validateConfig(
+    config: SsoConfig,
+    params?: { clientSecret?: string },
+  ): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await this.discover(config, params?.clientSecret)
+      return { ok: true }
+    } catch (err) {
+      let cause: unknown = err
+      for (let depth = 0; depth < 10 && cause instanceof Error; depth += 1) {
+        if (cause instanceof UnsafeOidcUrlError) {
+          const { translate } = await resolveTranslations()
+          const message = OIDC_URL_ERROR_MESSAGES[cause.reason]
+          return { ok: false, error: translate(message.key, message.fallback) }
+        }
+        cause = cause.cause
+      }
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Discovery failed',
+      }
+    }
+  }
+
+  private async discover(
+    config: SsoConfig,
+    clientSecret?: string,
+  ): Promise<client.Configuration> {
+    if (!config.issuer) {
+      throw new Error('SSO config is missing issuer URL')
+    }
+    if (!config.clientId) {
+      throw new Error('SSO config is missing client ID')
+    }
+
+    const clientSecretFingerprint = createHash('sha256')
+      .update(clientSecret ?? '')
+      .digest('base64url')
+    const cacheKey = `${config.id}:${config.updatedAt.getTime()}:${clientSecretFingerprint}`
+    const now = Date.now()
+    const cached =
+      this.requestDiscoveryCache.get(cacheKey) ?? sharedDiscoveryCache.get(cacheKey)
+    if (cached && cached.expiresAt > now) return cached.promise
+
+    for (const [key, entry] of sharedDiscoveryCache) {
+      if (entry.expiresAt <= now) sharedDiscoveryCache.delete(key)
+    }
+    if (sharedDiscoveryCache.size >= OIDC_DISCOVERY_CACHE_MAX_ENTRIES) {
+      const oldestKey = sharedDiscoveryCache.keys().next().value
+      if (oldestKey) sharedDiscoveryCache.delete(oldestKey)
+    }
+
+    const promise = client.discovery(
+      new URL(config.issuer),
+      config.clientId,
+      clientSecret ?? undefined,
+      undefined,
+      {
+        [client.customFetch]: this.guardedFetch,
+        timeout: OIDC_DISCOVERY_TIMEOUT_SECONDS,
+      },
+    )
+    const entry = {
+      expiresAt: now + OIDC_DISCOVERY_CACHE_TTL_MS,
+      promise,
+    }
+    this.requestDiscoveryCache.set(cacheKey, entry)
+    sharedDiscoveryCache.set(cacheKey, entry)
+    void promise
+      .then((configuration) => {
+        if (
+          typeof configuration.serverMetadata !== 'function' &&
+          sharedDiscoveryCache.get(cacheKey)?.promise === promise
+        ) {
+          sharedDiscoveryCache.delete(cacheKey)
+        }
+      })
+      .catch(() => {
+        if (this.requestDiscoveryCache.get(cacheKey)?.promise === promise) {
+          this.requestDiscoveryCache.delete(cacheKey)
+        }
+        if (sharedDiscoveryCache.get(cacheKey)?.promise === promise) {
+          sharedDiscoveryCache.delete(cacheKey)
+        }
+      })
+    return promise
+  }
+}
+
+async function mergeWithUserInfoClaims(
+  oidcConfig: client.Configuration,
+  tokens: client.TokenEndpointResponse,
+  claims: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const accessToken = tokens.access_token
+  if (!accessToken) return claims
+
+  try {
+    const userInfo = await client.fetchUserInfo(
+      oidcConfig,
+      accessToken,
+      client.skipSubjectCheck,
+    )
+    return { ...(userInfo as Record<string, unknown>), ...claims }
+  } catch {
+    return claims
+  }
+}
+
+export function normalizeEmailVerifiedClaim(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+export function extractIdentityGroups(claims: Record<string, unknown>): string[] | undefined {
+  const groups = new Set<string>()
+
+  const add = (value: unknown) => {
+    for (const group of coerceClaimValues(value)) {
+      groups.add(group)
+    }
+  }
+
+  add(claims.groups)
+  add(claims.roles)
+  add(claims.role)
+
+  for (const [key, value] of Object.entries(claims)) {
+    if (!key.endsWith(':roles')) continue
+    add(value)
+  }
+
+  return groups.size > 0 ? Array.from(groups) : undefined
+}
+
+export function coerceClaimValues(value: unknown): string[] {
+  if (typeof value === 'string') {
+    const normalized = value.trim()
+    return normalized ? [normalized] : []
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => coerceClaimValues(entry))
+  }
+
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    const out = new Set<string>()
+    for (const [key, nested] of entries) {
+      const normalizedKey = key.trim()
+      if (normalizedKey) out.add(normalizedKey)
+      if (typeof nested === 'string') {
+        const normalizedNested = nested.trim()
+        if (normalizedNested) out.add(normalizedNested)
+      } else if (nested && typeof nested === 'object') {
+        const nestedName = (nested as Record<string, unknown>).name
+        if (typeof nestedName === 'string' && nestedName.trim()) {
+          out.add(nestedName.trim())
+        }
+      }
+    }
+    return Array.from(out)
+  }
+
+  return []
+}

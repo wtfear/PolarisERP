@@ -1,0 +1,279 @@
+jest.mock('ai', () => ({
+  embed: jest.fn(),
+}))
+
+jest.mock('ai-sdk-ollama', () => ({
+  createOllama: jest.fn(() => ({ embedding: jest.fn(() => ({})) })),
+}))
+
+jest.mock('@ai-sdk/amazon-bedrock', () => ({
+  createAmazonBedrock: jest.fn(() => ({ embedding: jest.fn(() => ({})) })),
+}))
+
+import { embed } from 'ai'
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock'
+import { createOllama } from 'ai-sdk-ollama'
+import { EmbeddingService } from '../vector/services/embedding'
+
+const mockedEmbed = jest.mocked(embed)
+const mockedCreateOllama = jest.mocked(createOllama)
+const mockedCreateAmazonBedrock = jest.mocked(createAmazonBedrock)
+
+describe('EmbeddingService', () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env = { ...originalEnv }
+    delete process.env.OM_SEARCH_OLLAMA_BASE_URL_ALLOWLIST
+    delete process.env.OM_SEARCH_OLLAMA_ALLOW_PRIVATE
+  })
+
+  afterAll(() => {
+    process.env = originalEnv
+  })
+
+  it('times out stalled embedding requests', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '5'
+    mockedEmbed.mockImplementation(() => new Promise(() => undefined))
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).rejects.toThrow(
+      '[vector.embedding] Ollama (Local) request timed out after 5ms. Check OLLAMA_BASE_URL.',
+    )
+  })
+
+  it('aborts the in-flight request when it times out', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '5'
+    let capturedSignal: AbortSignal | undefined
+    mockedEmbed.mockImplementation((options) => {
+      capturedSignal = (options as { abortSignal?: AbortSignal }).abortSignal
+      return new Promise(() => undefined)
+    })
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).rejects.toThrow('timed out')
+    expect(capturedSignal).toBeInstanceOf(AbortSignal)
+    expect(capturedSignal?.aborted).toBe(true)
+  })
+
+  it('returns embeddings when provider responds before the timeout', async () => {
+    process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '100'
+    mockedEmbed.mockResolvedValue({ embedding: [0.25, 0.5, 0.75] } as Awaited<ReturnType<typeof embed>>)
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).resolves.toEqual([0.25, 0.5, 0.75])
+  })
+
+  it('injects the guarded fetch transport into the Ollama SDK client', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '100'
+    mockedEmbed.mockResolvedValue({ embedding: [0.25] } as Awaited<ReturnType<typeof embed>>)
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        baseUrl: 'https://ollama.example.com',
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).resolves.toEqual([0.25])
+    expect(mockedCreateOllama).toHaveBeenCalledWith({
+      baseURL: 'https://ollama.example.com',
+      fetch: expect.any(Function),
+    })
+  })
+
+  it('rejects persisted Ollama baseUrl pointing at a private IP in production', async () => {
+    process.env.NODE_ENV = 'production'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '100'
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        baseUrl: 'http://169.254.169.254/',
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).rejects.toThrow(
+      /Ollama base URL rejected \(private_ip_literal\)/,
+    )
+    expect(mockedEmbed).not.toHaveBeenCalled()
+  })
+
+  it('allows persisted Ollama baseUrl on loopback in development', async () => {
+    process.env.NODE_ENV = 'development'
+    process.env.VECTOR_EMBEDDING_TIMEOUT_MS = '100'
+    mockedEmbed.mockResolvedValue({ embedding: [0.1] } as Awaited<ReturnType<typeof embed>>)
+
+    const service = new EmbeddingService({
+      config: {
+        providerId: 'ollama',
+        model: 'nomic-embed-text',
+        dimension: 768,
+        baseUrl: 'http://127.0.0.1:11434',
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+    await expect(service.createEmbedding('test input')).resolves.toEqual([0.1])
+  })
+})
+
+describe('EmbeddingService Cohere inputType', () => {
+  const originalEnv = { ...process.env }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env = { ...originalEnv, COHERE_API_KEY: 'test-key' }
+    mockedEmbed.mockResolvedValue({ embedding: [0.1, 0.2] } as Awaited<ReturnType<typeof embed>>)
+  })
+
+  afterAll(() => {
+    process.env = originalEnv
+  })
+
+  const build = (dimension?: number) =>
+    new EmbeddingService({
+      config: {
+        providerId: 'cohere',
+        model: 'embed-english-v3.0',
+        dimension: 1024,
+        outputDimensionality: dimension,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+
+  const sentInputType = () =>
+    (mockedEmbed.mock.calls[0][0] as { providerOptions?: { cohere?: { inputType?: string } } })
+      .providerOptions?.cohere?.inputType
+
+  it.each([undefined, 1024])('embeds documents with search_document (outputDimensionality=%s)', async (dim) => {
+    await build(dim).createEmbedding('some document')
+    expect(sentInputType()).toBe('search_document')
+  })
+
+  it.each([undefined, 1024])('embeds queries with search_query (outputDimensionality=%s)', async (dim) => {
+    await build(dim).createEmbedding('what is a query', { purpose: 'query' })
+    expect(sentInputType()).toBe('search_query')
+  })
+})
+
+describe('EmbeddingService bedrock credentials', () => {
+  const originalEnv = { ...process.env }
+  const bedrockConfig = {
+    providerId: 'bedrock' as const,
+    model: 'amazon.titan-embed-text-v2:0',
+    dimension: 1024,
+    updatedAt: new Date().toISOString(),
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env = { ...originalEnv }
+    process.env.AWS_ACCESS_KEY_ID = 'ASIAEXAMPLE'
+    process.env.AWS_SECRET_ACCESS_KEY = 'secret'
+    delete process.env.AWS_SESSION_TOKEN
+    mockedEmbed.mockResolvedValue({ embedding: [0.1, 0.2] } as never)
+  })
+
+  afterAll(() => {
+    process.env = originalEnv
+  })
+
+  it('passes AWS_SESSION_TOKEN to the Bedrock client for temporary credentials', async () => {
+    process.env.AWS_SESSION_TOKEN = 'temporary-session-token'
+
+    await new EmbeddingService({ config: bedrockConfig }).createEmbedding('hello')
+
+    expect(mockedCreateAmazonBedrock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessKeyId: 'ASIAEXAMPLE',
+        secretAccessKey: 'secret',
+        sessionToken: 'temporary-session-token',
+      }),
+    )
+  })
+
+  it('leaves the session token unset for long-lived credentials', async () => {
+    await new EmbeddingService({ config: bedrockConfig }).createEmbedding('hello')
+
+    expect(mockedCreateAmazonBedrock.mock.calls[0][0]?.sessionToken).toBeUndefined()
+  })
+})
+
+describe('EmbeddingService.updateConfig', () => {
+  const baseConfig = {
+    providerId: 'ollama' as const,
+    model: 'nomic-embed-text',
+    dimension: 768,
+    updatedAt: '2024-01-01T00:00:00.000Z',
+    baseUrl: 'http://localhost:11434',
+  }
+
+  it('is a no-op when all fields match (clientCache is not cleared)', () => {
+    const service = new EmbeddingService({ config: { ...baseConfig } })
+    const configBefore = service.currentConfig
+    service.updateConfig({ ...baseConfig, updatedAt: '2099-01-01T00:00:00.000Z' })
+    expect(service.currentConfig).toEqual(configBefore)
+  })
+
+  it('updates config and clears cache when model changes', () => {
+    const service = new EmbeddingService({ config: { ...baseConfig } })
+    service.updateConfig({ ...baseConfig, model: 'mxbai-embed-large' })
+    expect(service.currentConfig.model).toBe('mxbai-embed-large')
+  })
+
+  it('updates config and clears cache when baseUrl changes', () => {
+    const service = new EmbeddingService({ config: { ...baseConfig } })
+    service.updateConfig({ ...baseConfig, baseUrl: 'http://my-ollama:11434' })
+    expect(service.currentConfig.baseUrl).toBe('http://my-ollama:11434')
+  })
+
+  it('does not compare updatedAt — same config with different updatedAt is a no-op', () => {
+    const service = new EmbeddingService({ config: { ...baseConfig } })
+    const dimensionBefore = service.dimension
+    service.updateConfig({ ...baseConfig, updatedAt: '2099-06-17T12:00:00.000Z' })
+    expect(service.dimension).toBe(dimensionBefore)
+    expect(service.currentConfig.updatedAt).toBe(baseConfig.updatedAt)
+  })
+
+  it('updates config when dimension changes', () => {
+    const service = new EmbeddingService({ config: { ...baseConfig } })
+    service.updateConfig({ ...baseConfig, dimension: 1024 })
+    expect(service.dimension).toBe(1024)
+  })
+})

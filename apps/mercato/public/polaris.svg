@@ -1,0 +1,33 @@
+<svg width="176" height="176" viewBox="0 0 176 176" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="176" height="176" rx="36" fill="url(#polaris_bg)" />
+  <!-- Radiant North Star (Polaris) -->
+  <g filter="url(#glow)">
+    <!-- Vertical/Horizontal Primary Spikes -->
+    <path d="M88 22 L94 76 L148 88 L94 100 L88 154 L82 100 L28 88 L82 76 Z" fill="url(#star_primary)"/>
+    <!-- Diagonal Secondary Spikes -->
+    <path d="M88 48 L93 83 L128 88 L93 93 L88 128 L83 93 L48 88 L83 83 Z" fill="url(#star_secondary)" opacity="0.85"/>
+    <!-- Central Core -->
+    <circle cx="88" cy="88" r="8" fill="#FFFFFF"/>
+    <circle cx="88" cy="88" r="4" fill="#38BDF8"/>
+  </g>
+  <defs>
+    <linearGradient id="polaris_bg" x1="0" y1="0" x2="176" y2="176" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="50%" stop-color="#1E1B4B"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="star_primary" x1="28" y1="22" x2="148" y2="154" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#818CF8"/>
+    </linearGradient>
+    <linearGradient id="star_secondary" x1="48" y1="48" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C084FC"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+    <filter id="glow" x="16" y="10" width="144" height="156" filterUnits="userSpaceOnUse">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+</svg>

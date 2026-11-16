@@ -1,0 +1,58 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const here = path.dirname(fileURLToPath(import.meta.url))
+const source = fs.readFileSync(path.resolve(here, '..', 'dev.mjs'), 'utf8')
+
+function functionBody(name) {
+  const start = source.indexOf(`function ${name}(`)
+  assert.notEqual(start, -1, `expected ${name}() in scripts/dev.mjs`)
+  const nextFunction = source.indexOf('\nfunction ', start + 1)
+  return source.slice(start, nextFunction === -1 ? source.length : nextFunction)
+}
+
+test('consolidated package watch runs as a direct Node child while legacy watch stays on Yarn', () => {
+  const body = functionBody('startPackageWatch')
+
+  assert.match(body, /watchScript === 'watch:packages'/)
+  assert.match(body, /command: process\.execPath, args: \[monorepoPackageWatchScript\]/)
+  assert.match(body, /command: yarnCommand, args: \[watchScript\]/)
+  assert.match(body, /spawnCommand\(watchCommand\.command, watchCommand\.args/)
+})
+
+test('monorepo app runtime runs its script directly from the app workspace', () => {
+  // The spawn moved into `runAppLifecycle` when the app gained the same
+  // restart-on-crash supervisor the MCP runtime has; `launchMonorepoAppDev`
+  // is now only the entry point that starts it.
+  const body = functionBody('runAppLifecycle')
+
+  assert.match(body, /const appArgs = \[monorepoAppDevScript\]/)
+  assert.match(body, /spawnCommand\(process\.execPath, appArgs/)
+  assert.match(body, /cwd: monorepoAppDir/)
+  assert.doesNotMatch(body, /workspace.*@open-mercato\/app/)
+})
+
+test('direct monorepo app runtime retains access to workspace binaries', () => {
+  assert.match(functionBody('buildAppDevEnv'), /env\.PATH = buildWorkspaceBinPath\(\)/)
+
+  const body = functionBody('buildWorkspaceBinPath')
+  assert.match(body, /node_modules', '\.bin'/)
+  assert.match(body, /path\.delimiter/)
+})
+
+test('MCP CLI runs as a direct Node child from the app workspace without a Yarn wrapper', () => {
+  const body = functionBody('spawnMcpCommand')
+
+  assert.match(body, /resolveMercatoInvocation\(\{ cwd: mcpCliCwd \}\)/)
+  assert.match(body, /cwd: mcpCliCwd/)
+  assert.match(body, /PATH: buildWorkspaceBinPath\(\)/)
+  assert.doesNotMatch(body, /yarnCommand/)
+  assert.match(source, /const mcpCliCwd = isMonorepo \? monorepoAppDir : process\.cwd\(\)/)
+})
+
+test('MCP cold-start admission retains app dotenv keys with process environment precedence', () => {
+  assert.match(functionBody('readKnownMcpApiKeys'), /process\.env\.MCP_SERVER_API_KEY \?\? appDotEnv\.MCP_SERVER_API_KEY/)
+})
