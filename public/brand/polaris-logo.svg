@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" width="100%" height="100%">
+  <defs>
+    <linearGradient id="polarisCore" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1E1B4B" />
+    </linearGradient>
+    <linearGradient id="goldGlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+    <linearGradient id="whiteGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+    <filter id="polarisAura" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect width="100%" height="100%" fill="#0B0F19" rx="16" />
+
+  <!-- Constellation Ursa Minor Matrix -->
+  <g opacity="0.18" stroke="#38BDF8" stroke-width="1.2">
+    <line x1="40" y1="20" x2="760" y2="20" />
+    <line x1="40" y1="110" x2="760" y2="110" />
+    <line x1="40" y1="200" x2="760" y2="200" />
+    <circle cx="110" cy="110" r="85" stroke-dasharray="3 5" fill="none" />
+  </g>
+
+  <!-- Polaris Star Icon (North Star Pole Anchor) -->
+  <g transform="translate(110, 110)">
+    <circle cx="0" cy="0" r="54" fill="url(#polarisCore)" opacity="0.3" filter="url(#polarisAura)" />
+    
+    <!-- Geometric 8-point Pole Star -->
+    <polygon points="0,-70 16,-16 70,0 16,16 0,70 -16,16 -70,0 -16,-16" fill="url(#polarisCore)" />
+    <!-- Secondary Gold Cross -->
+    <polygon points="0,-45 10,-10 45,0 10,10 0,45 -10,10 -45,0 -10,-10" fill="url(#goldGlow)" opacity="0.95" />
+    
+    <!-- Supergiant Core -->
+    <circle cx="0" cy="0" r="14" fill="#FFFFFF" />
+    <circle cx="0" cy="0" r="7" fill="#38BDF8" />
+  </g>
+
+  <!-- Typography -->
+  <text x="220" y="98" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="52" font-weight="900" letter-spacing="2" fill="url(#whiteGrad)">
+    POLARIS<tspan fill="#38BDF8">ERP</tspan>
+  </text>
+  
+  <text x="222" y="142" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" letter-spacing="5" fill="#94A3B8">
+    AUTONOMOUS ENTERPRISE ERP • CRM • WMS
+  </text>
+
+  <!-- Agency Quality Badge -->
+  <g transform="translate(222, 160)">
+    <rect width="180" height="26" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1" />
+    <circle cx="14" cy="13" r="5" fill="#10B981" />
+    <text x="28" y="17" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#E2E8F0" letter-spacing="0.5">
+      WTFEAR AGENCY CORE
+    </text>
+  </g>
+  <g transform="translate(414, 160)">
+    <rect width="150" height="26" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1" />
+    <text x="14" y="17" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#38BDF8" letter-spacing="0.5">
+      MIT LICENSED ENGINE
+    </text>
+  </g>
+</svg>

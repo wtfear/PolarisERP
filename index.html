@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PolarisERP — Autonomous Enterprise ERP, CRM & WMS | WTFear Sovereign</title>
+  <meta name="description" content="AI-native enterprise resource planning, multi-warehouse bin inventory management, and AGENTS.md autonomous automation by WTFear Agency.">
+  <link rel="icon" type="image/svg+xml" href="./brand/polaris-logo.svg">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              space: '#080C14',
+              surface: '#0F172A',
+              card: '#131E32',
+              border: '#1E293B',
+              blue: '#2563EB',
+              sky: '#38BDF8',
+              gold: '#F59E0B',
+              emerald: '#10B981',
+              rose: '#F43F5E'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.35; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+    .animate-glow {
+      animation: pulseGlow 6s infinite ease-in-out;
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #0F172A;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-brand-space text-slate-100 min-h-screen flex flex-col font-sans selection:bg-brand-sky selection:text-slate-900">
+
+  <!-- Header / Navigation -->
+  <header class="border-b border-brand-border/80 bg-brand-surface/90 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center space-x-6">
+      <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('overview')">
+        <div class="relative w-9 h-9 flex items-center justify-center bg-gradient-to-tr from-brand-blue to-brand-sky rounded-lg shadow-lg shadow-brand-sky/20">
+          <i data-lucide="compass" class="w-5 h-5 text-slate-900 stroke-[2.5]"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-xl tracking-tight text-white">POLARIS<span class="text-brand-sky">ERP</span></span>
+            <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-brand-sky/10 text-brand-sky border border-brand-sky/20">Autonomous v1.0</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium">WTFear Enterprise Sovereign</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center space-x-1 pl-4 border-l border-brand-border">
+        <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-brand-sky bg-brand-sky/10 transition-all flex items-center space-x-2">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Operations HUD</span>
+        </button>
+        <button onclick="switchTab('orders')" id="tab-btn-orders" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-2">
+          <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+          <span>Sales & Pipeline</span>
+        </button>
+        <button onclick="switchTab('wms')" id="tab-btn-wms" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-2">
+          <i data-lucide="boxes" class="w-4 h-4"></i>
+          <span>WMS & Inventory</span>
+        </button>
+        <button onclick="switchTab('agents')" id="tab-btn-agents" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-2">
+          <i data-lucide="bot" class="w-4 h-4"></i>
+          <span>AGENTS.md Harness</span>
+          <span class="w-2 h-2 rounded-full bg-brand-emerald animate-ping"></span>
+        </button>
+        <button onclick="switchTab('financials')" id="tab-btn-financials" class="tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-2">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+          <span>Ledger & Cash Flow</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Quick Action / Status -->
+    <div class="flex items-center space-x-3">
+      <div class="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-emerald/10 border border-brand-emerald/20 text-brand-emerald text-xs font-medium">
+        <span class="w-2 h-2 rounded-full bg-brand-emerald animate-pulse"></span>
+        <span>Edge Active • 0ms Lag</span>
+      </div>
+
+      <button onclick="openNewOrderModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-brand-sky to-brand-blue text-slate-900 hover:brightness-110 shadow-md shadow-brand-sky/20 transition-all flex items-center space-x-1.5">
+        <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
+        <span>New Order</span>
+      </button>
+
+      <a href="https://github.com/wtfear/PolarisERP" target="_blank" rel="noopener noreferrer" class="p-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition">
+        <i data-lucide="github" class="w-4 h-4"></i>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8 space-y-6">
+
+    <!-- KPI Metric Cards Bar -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="p-5 rounded-xl bg-brand-card border border-brand-border/70 hover:border-brand-sky/40 transition group">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Enterprise Run-Rate</span>
+          <div class="p-2 rounded-lg bg-brand-blue/10 text-brand-sky group-hover:scale-110 transition">
+            <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">$4,829,120</div>
+        <div class="mt-2 flex items-center text-xs text-brand-emerald font-semibold space-x-1">
+          <i data-lucide="trending-up" class="w-3.5 h-3.5"></i>
+          <span>+14.8% vs last quarter</span>
+          <span class="text-slate-500 font-normal ml-1">• Lead-to-Cash</span>
+        </div>
+      </div>
+
+      <div class="p-5 rounded-xl bg-brand-card border border-brand-border/70 hover:border-brand-sky/40 transition group">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Active Orders In Flight</span>
+          <div class="p-2 rounded-lg bg-brand-sky/10 text-brand-sky group-hover:scale-110 transition">
+            <i data-lucide="truck" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight" id="kpi-orders-count">184</div>
+        <div class="mt-2 flex items-center text-xs text-brand-sky font-semibold space-x-1">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-brand-emerald"></i>
+          <span>99.2% On-Time SLA</span>
+          <span class="text-slate-500 font-normal ml-1">• 3 Hubs</span>
+        </div>
+      </div>
+
+      <div class="p-5 rounded-xl bg-brand-card border border-brand-border/70 hover:border-brand-sky/40 transition group">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Autonomous AI Actions</span>
+          <div class="p-2 rounded-lg bg-brand-emerald/10 text-brand-emerald group-hover:scale-110 transition">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight" id="kpi-ai-actions">1,429</div>
+        <div class="mt-2 flex items-center text-xs text-brand-emerald font-semibold space-x-1">
+          <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+          <span>Zero Human Interventions</span>
+          <span class="text-slate-500 font-normal ml-1">• Today</span>
+        </div>
+      </div>
+
+      <div class="p-5 rounded-xl bg-brand-card border border-brand-border/70 hover:border-brand-sky/40 transition group">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Warehouse Capacity</span>
+          <div class="p-2 rounded-lg bg-brand-gold/10 text-brand-gold group-hover:scale-110 transition">
+            <i data-lucide="box" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="text-2xl lg:text-3xl font-extrabold text-white tracking-tight">84.6%</div>
+        <div class="mt-2 flex items-center text-xs text-slate-400 font-semibold space-x-1">
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div class="bg-gradient-to-r from-brand-sky to-brand-gold h-full rounded-full" style="width: 84.6%"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 1: OPERATIONS HUD OVERVIEW -->
+    <section id="view-overview" class="space-y-6">
+      
+      <!-- Mission Control Banner -->
+      <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-brand-surface via-brand-card to-brand-surface border border-brand-border p-6 lg:p-8">
+        <div class="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-brand-sky/10 filter blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 max-w-2xl">
+          <div class="inline-flex items-center space-x-2 px-2.5 py-1 rounded-md bg-brand-sky/10 border border-brand-sky/20 text-brand-sky text-xs font-bold mb-3">
+            <i data-lucide="orbit" class="w-3.5 h-3.5"></i>
+            <span>POLE STAR ARCHITECTURE</span>
+          </div>
+          <h2 class="text-2xl lg:text-3xl font-black text-white tracking-tight">Enterprise Operations & Autonomous Supply Chain</h2>
+          <p class="text-slate-400 text-sm mt-2 leading-relaxed">
+            PolarisERP coordinates lead capture, quotation approval, multi-location warehouse bin allocation, and ledger reconciliation without commercial SAP or NetSuite per-seat taxes. Powered by WTFear Agency's verified MIT engine.
+          </p>
+
+          <div class="mt-5 flex flex-wrap gap-3">
+            <button onclick="triggerStockAudit()" class="px-4 py-2 rounded-lg text-xs font-bold bg-brand-sky text-slate-950 hover:bg-white transition flex items-center space-x-2">
+              <i data-lucide="scan-line" class="w-4 h-4"></i>
+              <span>Trigger AI Warehouse Audit</span>
+            </button>
+            <button onclick="switchTab('wms')" class="px-4 py-2 rounded-lg text-xs font-bold bg-slate-800/80 text-slate-200 hover:bg-slate-700 hover:text-white border border-brand-border transition flex items-center space-x-2">
+              <i data-lucide="map-pin" class="w-4 h-4"></i>
+              <span>View Warehouse Allocations</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Two-Column Grid: Pipeline Activity & AI Stream -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Live Orders Table Preview -->
+        <div class="lg:col-span-2 rounded-xl bg-brand-card border border-brand-border p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="clock" class="w-4 h-4 text-brand-sky"></i>
+              <h3 class="font-bold text-white text-sm">Recent Enterprise Sales Orders</h3>
+            </div>
+            <button onclick="switchTab('orders')" class="text-xs text-brand-sky hover:underline font-semibold flex items-center space-x-1">
+              <span>View All Orders</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-slate-400 border-b border-brand-border/60">
+                <tr>
+                  <th class="py-2.5 px-3">Order ID</th>
+                  <th class="py-2.5 px-3">Enterprise Client</th>
+                  <th class="py-2.5 px-3">Fulfillment Hub</th>
+                  <th class="py-2.5 px-3">Valuation</th>
+                  <th class="py-2.5 px-3">Status</th>
+                  <th class="py-2.5 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="overview-orders-body" class="divide-y divide-brand-border/30">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Live Autonomous Agent Stream -->
+        <div class="rounded-xl bg-brand-card border border-brand-border p-5 flex flex-col space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i data-lucide="cpu" class="w-4 h-4 text-brand-emerald"></i>
+              <h3 class="font-bold text-white text-sm">AGENTS.md Event Stream</h3>
+            </div>
+            <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald">Live</span>
+          </div>
+
+          <div id="agent-event-stream" class="flex-1 space-y-2.5 overflow-y-auto max-h-[300px] custom-scroll pr-1 text-xs">
+            <!-- Dynamically populated event logs -->
+          </div>
+
+          <div class="pt-2 border-t border-brand-border/50 text-center">
+            <p class="text-[11px] text-slate-500 font-mono">Agent Loop: Active • Next poll in 3s</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- TAB 2: SALES & PIPELINE VIEW -->
+    <section id="view-orders" class="hidden space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-white">Sales & Enterprise Order Pipeline</h2>
+          <p class="text-xs text-slate-400">Manage lead quotation, contract approval, and cross-warehouse shipping states.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+            <input type="text" id="order-search-input" oninput="filterOrders()" placeholder="Search clients, PO #, hubs..." class="pl-9 pr-3 py-1.5 rounded-lg bg-brand-surface border border-brand-border text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-sky w-52 sm:w-64">
+          </div>
+          <button onclick="openNewOrderModal()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-sky text-slate-900 hover:brightness-110 transition flex items-center space-x-1.5">
+            <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
+            <span>Add Order</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Orders Full Table -->
+      <div class="rounded-xl bg-brand-card border border-brand-border overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 bg-brand-surface/70 border-b border-brand-border">
+              <tr>
+                <th class="py-3 px-4 font-semibold">Order / PO #</th>
+                <th class="py-3 px-4 font-semibold">Client Organization</th>
+                <th class="py-3 px-4 font-semibold">Fulfillment Warehouse</th>
+                <th class="py-3 px-4 font-semibold">Total Valuation</th>
+                <th class="py-3 px-4 font-semibold">Stage / Status</th>
+                <th class="py-3 px-4 font-semibold">Autonomous Task</th>
+                <th class="py-3 px-4 font-semibold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="full-orders-body" class="divide-y divide-brand-border/40 text-slate-300">
+              <!-- Populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: WMS & WAREHOUSE INVENTORY -->
+    <section id="view-wms" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-extrabold text-white">Multi-Warehouse Bin & Stock Matrix</h2>
+          <p class="text-xs text-slate-400">Autonomous WMS tracking across North America, EMEA, and APAC fulfillment zones.</p>
+        </div>
+        <div class="flex items-center space-x-3">
+          <button onclick="triggerStockAudit()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-sky text-slate-900 hover:brightness-110 transition flex items-center space-x-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Re-scan All Bins</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Warehouse 1 -->
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-emerald"></span>
+              <h3 class="font-bold text-white text-sm">Hub Alpha — Seattle</h3>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">US-WEST</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-400">
+            <div class="flex justify-between"><span>Bin Capacity:</span> <span class="text-white font-semibold">4,800 Bins</span></div>
+            <div class="flex justify-between"><span>Utilization:</span> <span class="text-brand-sky font-semibold">91.4%</span></div>
+            <div class="flex justify-between"><span>SKU Density:</span> <span class="text-white font-semibold">1,240 Types</span></div>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div class="bg-brand-sky h-full rounded-full" style="width: 91.4%"></div>
+          </div>
+        </div>
+
+        <!-- Warehouse 2 -->
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-emerald"></span>
+              <h3 class="font-bold text-white text-sm">Hub Beta — Frankfurt</h3>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">EU-CENTRAL</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-400">
+            <div class="flex justify-between"><span>Bin Capacity:</span> <span class="text-white font-semibold">3,600 Bins</span></div>
+            <div class="flex justify-between"><span>Utilization:</span> <span class="text-brand-emerald font-semibold">78.2%</span></div>
+            <div class="flex justify-between"><span>SKU Density:</span> <span class="text-white font-semibold">980 Types</span></div>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div class="bg-brand-emerald h-full rounded-full" style="width: 78.2%"></div>
+          </div>
+        </div>
+
+        <!-- Warehouse 3 -->
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-emerald"></span>
+              <h3 class="font-bold text-white text-sm">Hub Gamma — Singapore</h3>
+            </div>
+            <span class="text-[11px] font-mono text-slate-400">AP-SOUTH</span>
+          </div>
+          <div class="space-y-1 text-xs text-slate-400">
+            <div class="flex justify-between"><span>Bin Capacity:</span> <span class="text-white font-semibold">4,000 Bins</span></div>
+            <div class="flex justify-between"><span>Utilization:</span> <span class="text-brand-gold font-semibold">84.1%</span></div>
+            <div class="flex justify-between"><span>SKU Density:</span> <span class="text-white font-semibold">1,120 Types</span></div>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+            <div class="bg-brand-gold h-full rounded-full" style="width: 84.1%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stock SKU Master Table -->
+      <div class="rounded-xl bg-brand-card border border-brand-border p-5 space-y-3">
+        <h3 class="font-bold text-white text-sm">High-Velocity Inventory SKUs</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 border-b border-brand-border">
+              <tr>
+                <th class="py-2.5 px-3">SKU Identifier</th>
+                <th class="py-2.5 px-3">Item Description</th>
+                <th class="py-2.5 px-3">Allocated Bin</th>
+                <th class="py-2.5 px-3">Current Stock</th>
+                <th class="py-2.5 px-3">Safety Reorder Point</th>
+                <th class="py-2.5 px-3">Replenishment Status</th>
+              </tr>
+            </thead>
+            <tbody id="wms-sku-body" class="divide-y divide-brand-border/30">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: AGENTS.MD HARNESS -->
+    <section id="view-agents" class="hidden space-y-6">
+      <div class="p-6 rounded-2xl bg-gradient-to-r from-brand-surface to-brand-card border border-brand-border">
+        <div class="flex items-center space-x-3 mb-3">
+          <div class="p-2.5 rounded-xl bg-brand-emerald/10 text-brand-emerald">
+            <i data-lucide="bot" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-white">AGENTS.md Autonomous Operations Engine</h2>
+            <p class="text-xs text-slate-400">Sovereign agentic background worker executing automated ERP operations.</p>
+          </div>
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed max-w-3xl">
+          Unlike standard ERPs that demand high-touch manual data entry, PolarisERP natively parses <code class="text-brand-sky font-mono font-bold">AGENTS.md</code> specifications. AI coding agents inspect stock levels, draft purchase orders, reconcile bank statements, and resolve fulfillment mismatches autonomously.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border space-y-4">
+          <h3 class="font-bold text-white text-sm flex items-center space-x-2">
+            <i data-lucide="check-square" class="w-4 h-4 text-brand-sky"></i>
+            <span>Configured Autonomous Routines</span>
+          </h3>
+          <div class="space-y-3 text-xs">
+            <div class="p-3 rounded-lg bg-brand-surface border border-brand-border flex items-start justify-between">
+              <div>
+                <p class="font-semibold text-white">Daily PO Reconciliation Agent</p>
+                <p class="text-slate-400 text-[11px]">Matches incoming vendor shipments to generated purchase orders.</p>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-bold text-[10px]">Active</span>
+            </div>
+
+            <div class="p-3 rounded-lg bg-brand-surface border border-brand-border flex items-start justify-between">
+              <div>
+                <p class="font-semibold text-white">Predictive Reorder Trigger</p>
+                <p class="text-slate-400 text-[11px]">Autonomously generates stock requests when bin levels breach safety buffers.</p>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-bold text-[10px]">Active</span>
+            </div>
+
+            <div class="p-3 rounded-lg bg-brand-surface border border-brand-border flex items-start justify-between">
+              <div>
+                <p class="font-semibold text-white">Tax & Indian GST / EU VAT Validator</p>
+                <p class="text-slate-400 text-[11px]">Validates HSN/SAC codes, reverse charge triggers, and jurisdiction rules.</p>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-bold text-[10px]">Active</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-white text-sm flex items-center space-x-2 mb-3">
+              <i data-lucide="terminal" class="w-4 h-4 text-brand-gold"></i>
+              <span>Live Agent Execution Prompt</span>
+            </h3>
+            <div class="p-3.5 rounded-lg bg-slate-950 font-mono text-[11px] text-brand-sky space-y-1.5 border border-brand-border">
+              <p class="text-slate-500">// Run autonomous stock inspection command</p>
+              <p><span class="text-brand-emerald">$</span> polaris-agent execute --task=inventory-audit</p>
+              <p class="text-slate-400">> Scanning 12,400 SKU bins across 3 regions...</p>
+              <p class="text-slate-400">> Verified 99.8% discrepancy-free balance.</p>
+              <p class="text-brand-emerald">✔ Audit completed: 0 critical variance detected.</p>
+            </div>
+          </div>
+
+          <div class="pt-4">
+            <button onclick="triggerStockAudit()" class="w-full py-2.5 rounded-lg bg-gradient-to-r from-brand-sky to-brand-blue text-slate-900 font-bold text-xs hover:brightness-110 transition flex items-center justify-center space-x-2">
+              <i data-lucide="zap" class="w-4 h-4 stroke-[2.5]"></i>
+              <span>Simulate Autonomous Action Now</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: FINANCIALS & LEDGER -->
+    <section id="view-financials" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-extrabold text-white">General Ledger & Accounts Receivable</h2>
+          <p class="text-xs text-slate-400">Real-time enterprise balance sheets and automated invoicing reconciliation.</p>
+        </div>
+        <button onclick="exportData()" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-brand-surface border border-brand-border text-slate-200 hover:text-white hover:bg-slate-800 transition flex items-center space-x-1.5">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Export Ledger (JSON)</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border">
+          <p class="text-xs font-semibold text-slate-400 uppercase">Total Accounts Receivable</p>
+          <p class="text-2xl font-bold text-white mt-1">$1,248,300</p>
+          <p class="text-xs text-brand-emerald mt-2 font-medium">92% Due &lt; 30 days</p>
+        </div>
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border">
+          <p class="text-xs font-semibold text-slate-400 uppercase">Accounts Payable</p>
+          <p class="text-2xl font-bold text-white mt-1">$482,900</p>
+          <p class="text-xs text-slate-400 mt-2 font-medium">Scheduled for Friday run</p>
+        </div>
+        <div class="p-5 rounded-xl bg-brand-card border border-brand-border">
+          <p class="text-xs font-semibold text-slate-400 uppercase">Net Free Cash Flow</p>
+          <p class="text-2xl font-bold text-brand-sky mt-1">+$765,400</p>
+          <p class="text-xs text-brand-emerald mt-2 font-medium">+22.4% vs trailing quarter</p>
+        </div>
+      </div>
+
+      <div class="rounded-xl bg-brand-card border border-brand-border p-5">
+        <h3 class="font-bold text-white text-sm mb-3">Recent Ledger Journals</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 border-b border-brand-border">
+              <tr>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Journal Ref</th>
+                <th class="py-2.5 px-3">Account Description</th>
+                <th class="py-2.5 px-3">Debit</th>
+                <th class="py-2.5 px-3">Credit</th>
+                <th class="py-2.5 px-3">Verification</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-brand-border/30 text-slate-300">
+              <tr>
+                <td class="py-2.5 px-3 font-mono text-slate-400">2026-11-17</td>
+                <td class="py-2.5 px-3 font-mono font-bold text-brand-sky">JRN-9021</td>
+                <td class="py-2.5 px-3">Apex Global — Invoice INV-8491 Payment</td>
+                <td class="py-2.5 px-3 text-brand-emerald font-mono font-semibold">$142,500.00</td>
+                <td class="py-2.5 px-3 text-slate-500 font-mono">-</td>
+                <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-semibold text-[10px]">Auto-Matched</span></td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-mono text-slate-400">2026-11-16</td>
+                <td class="py-2.5 px-3 font-mono font-bold text-brand-sky">JRN-9020</td>
+                <td class="py-2.5 px-3">Starlight Logistics — Multi-Hub Freight Settlement</td>
+                <td class="py-2.5 px-3 text-slate-500 font-mono">-</td>
+                <td class="py-2.5 px-3 text-rose-400 font-mono font-semibold">$18,400.00</td>
+                <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-semibold text-[10px]">Auto-Matched</span></td>
+              </tr>
+              <tr>
+                <td class="py-2.5 px-3 font-mono text-slate-400">2026-11-15</td>
+                <td class="py-2.5 px-3 font-mono font-bold text-brand-sky">JRN-9019</td>
+                <td class="py-2.5 px-3">Vanguard Industrial — Wire Deposit</td>
+                <td class="py-2.5 px-3 text-brand-emerald font-mono font-semibold">$98,000.00</td>
+                <td class="py-2.5 px-3 text-slate-500 font-mono">-</td>
+                <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded bg-brand-emerald/10 text-brand-emerald font-semibold text-[10px]">Auto-Matched</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal: Create New Order -->
+  <div id="modal-new-order" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-brand-card border border-brand-border rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-brand-border pb-3">
+        <h3 class="text-base font-bold text-white flex items-center space-x-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-brand-sky"></i>
+          <span>Create Enterprise Order</span>
+        </h3>
+        <button onclick="closeNewOrderModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Client Organization</label>
+          <input type="text" id="input-client" placeholder="e.g. Acme Hyperloop Inc." class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-white focus:outline-none focus:border-brand-sky">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Fulfillment Hub</label>
+            <select id="input-hub" class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-white focus:outline-none focus:border-brand-sky">
+              <option value="Hub Alpha (Seattle)">Hub Alpha (Seattle)</option>
+              <option value="Hub Beta (Frankfurt)">Hub Beta (Frankfurt)</option>
+              <option value="Hub Gamma (Singapore)">Hub Gamma (Singapore)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-slate-300 font-semibold mb-1">Order Valuation ($)</label>
+            <input type="number" id="input-value" placeholder="e.g. 85000" class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-white focus:outline-none focus:border-brand-sky">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-slate-300 font-semibold mb-1">Priority Classification</label>
+          <select id="input-priority" class="w-full px-3 py-2 rounded-lg bg-brand-surface border border-brand-border text-white focus:outline-none focus:border-brand-sky">
+            <option value="Standard SLA">Standard SLA (72h)</option>
+            <option value="High Priority">High Priority (24h)</option>
+            <option value="Critical Autonomous">Critical Autonomous (Instant Bin Dispatch)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pt-3 flex items-center justify-end space-x-3 border-t border-brand-border">
+        <button onclick="closeNewOrderModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white transition">Cancel</button>
+        <button onclick="submitNewOrder()" class="px-4 py-2 rounded-lg text-xs font-bold bg-brand-sky text-slate-900 hover:brightness-110 transition">Confirm & Dispatch</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-brand-border bg-brand-surface/90 text-xs text-slate-400 py-6 px-4 lg:px-8 mt-auto">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <span class="font-extrabold text-white tracking-tight">POLARIS<span class="text-brand-sky">ERP</span></span>
+        <span class="text-slate-600">•</span>
+        <span>Engineered by <a href="https://github.com/wtfear" target="_blank" class="text-brand-sky hover:underline font-semibold">WTFear Agency</a></span>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="px-2 py-0.5 rounded bg-brand-border text-[11px] text-slate-300 font-mono">100% Free Edge Deployment</span>
+        <span class="px-2 py-0.5 rounded bg-brand-border text-[11px] text-slate-300 font-mono">Pure MIT Core</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Logic -->
+  <script>
+    const state = {
+      activeTab: 'overview',
+      orders: [
+        { id: 'ORD-8921', client: 'Apex Global Logistics', hub: 'Hub Alpha (Seattle)', value: 142500, status: 'Shipped', agentTask: 'Auto-Dispatched' },
+        { id: 'ORD-8922', client: 'Cyberdyne Energy Ltd', hub: 'Hub Beta (Frankfurt)', value: 89000, status: 'Confirmed', agentTask: 'Bin Allotted' },
+        { id: 'ORD-8923', client: 'Vanguard Industrial Co', hub: 'Hub Gamma (Singapore)', value: 312000, status: 'In Transit', agentTask: 'Customs Cleared' },
+        { id: 'ORD-8924', client: 'Helios Semiconductor', hub: 'Hub Alpha (Seattle)', value: 520000, status: 'Under Review', agentTask: 'Credit Approved' },
+        { id: 'ORD-8925', client: 'Quantum Cloud Systems', hub: 'Hub Beta (Frankfurt)', value: 64200, status: 'Delivered', agentTask: 'Reconciled' }
+      ],
+      skus: [
+        { sku: 'PLR-MOD-01', desc: 'Enterprise Rack Mount Server V4', bin: 'A-12-04', stock: 840, min: 200, status: 'Optimal' },
+        { sku: 'PLR-OPT-92', desc: '100G Dense WDM Optical Transceiver', bin: 'B-04-18', stock: 1250, min: 350, status: 'Optimal' },
+        { sku: 'PLR-POW-48', desc: '48V Industrial Battery Inverter', bin: 'C-08-02', stock: 110, min: 100, status: 'Reorder Buffer' },
+        { sku: 'PLR-ARM-07', desc: 'Autonomous Robotic Conveyor Arm', bin: 'A-01-11', stock: 42, min: 15, status: 'Optimal' }
+      ],
+      events: [
+        { time: '17:46:12', msg: 'PO-7429 reconciled against SAP EDI feed (0 mismatch)' },
+        { time: '17:44:30', msg: 'Hub Alpha Bin A-12-04 stock re-indexed by AI agent' },
+        { time: '17:41:05', msg: 'Invoice INV-8491 generated for Apex Global ($142.5k)' },
+        { time: '17:39:18', msg: 'HSN code verified for EU VAT cross-border dispatch' }
+      ]
+    };
+
+    function renderOrders() {
+      const overviewBody = document.getElementById('overview-orders-body');
+      if (overviewBody) {
+        overviewBody.innerHTML = state.orders.slice(0, 4).map(o => `
+          <tr class="hover:bg-brand-surface/40 transition">
+            <td class="py-2.5 px-3 font-mono font-bold text-brand-sky">${o.id}</td>
+            <td class="py-2.5 px-3 font-semibold text-white">${o.client}</td>
+            <td class="py-2.5 px-3 text-slate-400">${o.hub}</td>
+            <td class="py-2.5 px-3 font-mono font-bold text-white">$${o.value.toLocaleString()}</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadge(o.status)}">${o.status}</span>
+            </td>
+            <td class="py-2.5 px-3 text-right">
+              <button onclick="advanceOrderStatus('${o.id}')" class="px-2 py-1 rounded bg-brand-surface hover:bg-slate-700 text-slate-300 font-medium text-[11px] border border-brand-border transition">Advance</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const fullBody = document.getElementById('full-orders-body');
+      if (fullBody) {
+        fullBody.innerHTML = state.orders.map(o => `
+          <tr class="hover:bg-brand-surface/50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-brand-sky">${o.id}</td>
+            <td class="py-3 px-4 font-semibold text-white">${o.client}</td>
+            <td class="py-3 px-4 text-slate-300">${o.hub}</td>
+            <td class="py-3 px-4 font-mono font-bold text-white">$${o.value.toLocaleString()}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadge(o.status)}">${o.status}</span>
+            </td>
+            <td class="py-3 px-4 text-slate-400 font-mono text-[11px]">${o.agentTask}</td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="advanceOrderStatus('${o.id}')" class="px-2.5 py-1 rounded bg-brand-surface hover:bg-brand-sky/20 hover:text-brand-sky text-slate-300 font-medium text-xs border border-brand-border transition">Advance Stage</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const kpiCount = document.getElementById('kpi-orders-count');
+      if (kpiCount) kpiCount.innerText = state.orders.length + 179;
+    }
+
+    function renderSKUs() {
+      const skuBody = document.getElementById('wms-sku-body');
+      if (skuBody) {
+        skuBody.innerHTML = state.skus.map(s => `
+          <tr class="hover:bg-brand-surface/40 transition">
+            <td class="py-2.5 px-3 font-mono font-bold text-brand-sky">${s.sku}</td>
+            <td class="py-2.5 px-3 font-semibold text-white">${s.desc}</td>
+            <td class="py-2.5 px-3 font-mono text-slate-400">${s.bin}</td>
+            <td class="py-2.5 px-3 font-mono font-bold text-white">${s.stock} units</td>
+            <td class="py-2.5 px-3 font-mono text-slate-400">${s.min} units</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.status === 'Optimal' ? 'bg-brand-emerald/10 text-brand-emerald' : 'bg-brand-gold/10 text-brand-gold'}">${s.status}</span>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    function renderEvents() {
+      const stream = document.getElementById('agent-event-stream');
+      if (stream) {
+        stream.innerHTML = state.events.map(e => `
+          <div class="p-2.5 rounded-lg bg-brand-surface/80 border border-brand-border/60 hover:border-brand-sky/40 transition flex items-start space-x-2">
+            <span class="font-mono text-[10px] text-slate-500 pt-0.5">${e.time}</span>
+            <span class="text-slate-300 text-[11px] leading-tight flex-1">${e.msg}</span>
+          </div>
+        `).join('');
+      }
+    }
+
+    function getStatusBadge(status) {
+      switch(status) {
+        case 'Delivered': return 'bg-brand-emerald/10 text-brand-emerald border border-brand-emerald/20';
+        case 'In Transit':
+        case 'Shipped': return 'bg-brand-sky/10 text-brand-sky border border-brand-sky/20';
+        case 'Confirmed': return 'bg-brand-blue/10 text-brand-sky border border-brand-blue/20';
+        default: return 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20';
+      }
+    }
+
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      ['overview', 'orders', 'wms', 'agents', 'financials'].forEach(t => {
+        const view = document.getElementById('view-' + t);
+        const btn = document.getElementById('tab-btn-' + t);
+        if (view) view.classList.toggle('hidden', t !== tabId);
+        if (btn) {
+          if (t === tabId) {
+            btn.className = "tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-brand-sky bg-brand-sky/10 transition-all flex items-center space-x-2";
+          } else {
+            btn.className = "tab-btn px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800/60 transition-all flex items-center space-x-2";
+          }
+        }
+      });
+      lucide.createIcons();
+    }
+
+    function advanceOrderStatus(orderId) {
+      const order = state.orders.find(o => o.id === orderId);
+      if (!order) return;
+      const stages = ['Under Review', 'Confirmed', 'Shipped', 'In Transit', 'Delivered'];
+      const currentIndex = stages.indexOf(order.status);
+      if (currentIndex < stages.length - 1) {
+        order.status = stages[currentIndex + 1];
+        addEvent('Order ' + order.id + ' status transitioned to ' + order.status);
+        renderOrders();
+      }
+    }
+
+    function addEvent(msg) {
+      const d = new Date();
+      const timeStr = d.toTimeString().split(' ')[0];
+      state.events.unshift({ time: timeStr, msg: msg });
+      if (state.events.length > 20) state.events.pop();
+      renderEvents();
+      
+      const kpiActions = document.getElementById('kpi-ai-actions');
+      if (kpiActions) {
+        const cur = parseInt(kpiActions.innerText.replace(/,/g, '')) || 1429;
+        kpiActions.innerText = (cur + 1).toLocaleString();
+      }
+    }
+
+    function triggerStockAudit() {
+      addEvent('Autonomous audit started: Verifying all 12,400 bins...');
+      setTimeout(() => {
+        addEvent('Audit complete: Bin allocation aligned across all 3 zones.');
+        alert('Autonomous Audit Complete: All 12,400 bins verified discrepancy-free.');
+      }, 700);
+    }
+
+    function openNewOrderModal() {
+      document.getElementById('modal-new-order').classList.remove('hidden');
+    }
+    function closeNewOrderModal() {
+      document.getElementById('modal-new-order').classList.add('hidden');
+    }
+
+    function submitNewOrder() {
+      const client = document.getElementById('input-client').value.trim();
+      const hub = document.getElementById('input-hub').value;
+      const value = parseInt(document.getElementById('input-value').value) || 75000;
+      if (!client) {
+        alert('Please specify the Client Organization.');
+        return;
+      }
+      const newId = 'ORD-' + (8920 + state.orders.length + 1);
+      state.orders.unshift({
+        id: newId,
+        client: client,
+        hub: hub,
+        value: value,
+        status: 'Confirmed',
+        agentTask: 'Auto-Dispatched'
+      });
+      addEvent('New enterprise order ' + newId + ' generated for ' + client + ' ($' + value.toLocaleString() + ')');
+      renderOrders();
+      closeNewOrderModal();
+      document.getElementById('input-client').value = '';
+      document.getElementById('input-value').value = '';
+    }
+
+    function filterOrders() {
+      const q = document.getElementById('order-search-input').value.toLowerCase();
+      const fullBody = document.getElementById('full-orders-body');
+      if (!fullBody) return;
+      const filtered = state.orders.filter(o => 
+        o.id.toLowerCase().includes(q) ||
+        o.client.toLowerCase().includes(q) ||
+        o.hub.toLowerCase().includes(q)
+      );
+      fullBody.innerHTML = filtered.map(o => `
+        <tr class="hover:bg-brand-surface/50 transition">
+          <td class="py-3 px-4 font-mono font-bold text-brand-sky">${o.id}</td>
+          <td class="py-3 px-4 font-semibold text-white">${o.client}</td>
+          <td class="py-3 px-4 text-slate-300">${o.hub}</td>
+          <td class="py-3 px-4 font-mono font-bold text-white">$${o.value.toLocaleString()}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${getStatusBadge(o.status)}">${o.status}</span>
+          </td>
+          <td class="py-3 px-4 text-slate-400 font-mono text-[11px]">${o.agentTask}</td>
+          <td class="py-3 px-4 text-right">
+            <button onclick="advanceOrderStatus('${o.id}')" class="px-2.5 py-1 rounded bg-brand-surface hover:bg-brand-sky/20 hover:text-brand-sky text-slate-300 font-medium text-xs border border-brand-border transition">Advance Stage</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function exportData() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "polaris_erp_ledger_export.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    // Initialize
+    window.addEventListener('DOMContentLoaded', () => {
+      renderOrders();
+      renderSKUs();
+      renderEvents();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

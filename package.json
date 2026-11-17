@@ -4,11 +4,8 @@
   "description": "PolarisERP: AI-Native Autonomous Enterprise CRM & ERP Framework by WTFear Agency",
   "author": "WTFear Agency <https://github.com/wtfear>",
   "private": true,
-  "packageManager": "yarn@4.17.1+sha512.ccbfabf7d7b6b32075088be9386fb9a2e00bb6887ef07fa56effabc890a56d53da1ccc4128d62db245fcbd3961b236d75335bdf7d5320ed6eafb7588b7ad4697",
-  "engines": {
-    "node": "24.x"
-  },
-  "workspaces": [
+  "type": "module",
+  "workspaces_disabled": [
     "apps/*",
     "packages/*",
     "external/official-modules/packages/*"
@@ -31,7 +28,7 @@
     "dev:watch-select": "node ./scripts/watch-select.mjs",
     "watch:packages": "node ./scripts/watch-packages.mjs",
     "watch:packages:legacy": "turbo run watch --filter='./packages/*' --concurrency=32",
-    "build": "yarn build:packages && yarn generate && yarn build:packages && yarn build:app",
+    "build": "node build.js",
     "build:app": "turbo run build --filter=@open-mercato/app",
     "build:packages": "turbo run build --filter='./packages/*'",
     "lint": "turbo run lint",
